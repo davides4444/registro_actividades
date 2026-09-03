@@ -221,19 +221,13 @@
     statusMessage.style.display = "block";
   }
 
-  // Activar funciones PWA
+  // Activar funciones PWA llamando a sw.js
   if ('serviceWorker' in navigator) {
-    const swCode = `
-      self.addEventListener('install', e => self.skipWaiting());
-      self.addEventListener('activate', e => self.clients.claim());
-      self.addEventListener('fetch', e => {
-        if (e.request.method === 'GET') {
-          e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
-        }
-      });
-    `;
-    const blob = new Blob([swCode], { type: 'application/javascript' });
-    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log("Service Worker registrado con éxito"))
+        .catch((err) => console.error("Error al registrar SW:", err));
+    });
   }
 </script>
 
