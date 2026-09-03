@@ -3,52 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registro y Centro de Mando IA</title>
+  <title>Registro & Centro de Control IA</title>
   <meta name="theme-color" content="#2563eb">
   <style>
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
-    body { background-color: #f1f5f9; color: #1e293b; padding-bottom: 70px; }
-    
-    /* Navegación por Pestañas */
-    .tab-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
-      display: flex; justify-content: space-around; border-top: 1px solid #e2e8f0; z-index: 1000;
-    }
-    .tab-btn {
-      flex: 1; padding: 12px 0; text-align: center; background: none; border: none;
-      font-size: 0.8rem; font-weight: 600; color: #64748b; cursor: pointer;
-    }
-    .tab-btn.active { color: #2563eb; border-top: 3px solid #2563eb; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f1f5f9; color: #0f172a; padding-bottom: 70px; }
 
-    .container { max-width: 500px; margin: 16px auto; padding: 16px; background: #fff; border-radius: 12px; }
+    header { background: #2563eb; color: #fff; padding: 14px 16px; text-align: center; font-size: 1.1rem; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+    .container { max-width: 480px; margin: 16px auto; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
     .page { display: none; }
     .page.active { display: block; }
 
-    /* Estilos del Formulario */
+    /* Formulario */
     .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
-    input, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    .btn { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-weight: 600; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
+    input:focus, textarea:focus { border-color: #2563eb; }
+    textarea { resize: vertical; min-height: 80px; }
 
-    /* Estilos del Chat */
-    .chat-box { height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 10px; background: #f8fafc; }
-    .msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; max-width: 85%; }
-    .msg.user { background: #2563eb; color: #fff; margin-left: auto; }
-    .msg.ia { background: #e2e8f0; color: #0f172a; margin-right: auto; }
+    .btn { width: 100%; padding: 12px; background: #2563eb; color: #ffffff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn:active { background: #1d4ed8; }
+
+    /* Estado de Conexión */
+    .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-bottom: 12px; }
+    .online { background: #dcfce7; color: #166534; }
+    .offline { background: #fef3c7; color: #92400e; }
+
+    /* Chat UI */
+    .chat-container { display: flex; flex-direction: column; height: 350px; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; margin-bottom: 10px; }
+    .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; margin-bottom: 8px; word-wrap: break-word; }
+    .msg.user { background: #2563eb; color: #fff; margin-left: auto; border-bottom-right-radius: 2px; }
+    .msg.ia { background: #e2e8f0; color: #0f172a; margin-right: auto; border-bottom-left-radius: 2px; }
+
+    .chat-input-group { display: flex; gap: 8px; }
+    .chat-input-group input { flex: 1; }
+    .chat-input-group button { width: auto; padding: 0 16px; }
+
+    /* Dashboard UI */
+    .dashboard-content { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap; margin-top: 12px; max-height: 400px; overflow-y: auto; }
+
+    /* Tab Bar Inferior */
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; display: flex; justify-content: space-around; border-top: 1px solid #e2e8f0; z-index: 1000; height: 60px; }
+    .tab-btn { flex: 1; background: none; border: none; font-size: 0.75rem; font-weight: 600; color: #64748b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+    .tab-btn.active { color: #2563eb; border-top: 3px solid #2563eb; }
+    .tab-btn span { font-size: 1.2rem; }
+
+    /* Toast Flotante */
+    #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 2000; }
+    #toast.show { opacity: 1; }
   </style>
 </head>
 <body>
 
+  <header>📌 Registro & Centro de Control IA</header>
+  <div id="toast">Mensaje</div>
+
   <!-- PESTAÑA 1: REGISTRO -->
   <div id="page-registro" class="page active">
     <div class="container">
-      <h2>📝 Registrar Actividad</h2>
-      <form id="activityForm">
-        <div class="form-group"><label>Fecha</label><input type="date" id="fecha" required></div>
-        <div class="form-group"><label>Nombre</label><input type="text" id="nombre" required></div>
-        <div class="form-group"><label>Cargo</label><input type="text" id="cargo" required></div>
-        <div class="form-group"><label>Actividad</label><textarea id="actividad" required></textarea></div>
-        <button type="submit" class="btn">Enviar Registro</button>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1.1rem;">📝 Registrar Actividad</h2>
+        <span id="connectionStatus" class="status-badge online">En línea</span>
+      </div>
+
+      <form id="activityForm" style="margin-top: 12px;">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="fecha" required>
+        </div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="nombre" placeholder="Tu nombre" required>
+        </div>
+        <div class="form-group">
+          <label>Cargo</label>
+          <input type="text" id="cargo" placeholder="Tu cargo/puesto" required>
+        </div>
+        <div class="form-group">
+          <label>Descripción de la Actividad</label>
+          <textarea id="actividad" placeholder="Escribe aquí lo que realizaste..." required></textarea>
+        </div>
+        <button type="submit" class="btn" id="btnSubmit">💾 Guardar Actividad</button>
       </form>
     </div>
   </div>
@@ -56,74 +94,201 @@
   <!-- PESTAÑA 2: DASHBOARD -->
   <div id="page-dashboard" class="page">
     <div class="container">
-      <h2>📊 Dashboard de IA</h2>
-      <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">Haz clic para generar el análisis consolidado de la hoja.</p>
-      <button class="btn" onclick="solicitarDashboard()">Cargar Dashboard</button>
-      <div id="dashboardOutput" style="margin-top: 15px; white-space: pre-line; font-size: 0.85rem;"></div>
+      <h2 style="font-size: 1.1rem; margin-bottom: 8px;">📊 Dashboard e Indicadores IA</h2>
+      <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 12px;">Obtén un análisis automático con KPIs, patrones y causa raíz de tus actividades registradas.</p>
+      <button class="btn" onclick="cargarDashboard()">🔄 Generar / Actualizar Dashboard</button>
+      <div id="dashboardOutput" class="dashboard-content">Toca el botón superior para procesar las actividades registradas...</div>
     </div>
   </div>
 
   <!-- PESTAÑA 3: CHAT IA -->
   <div id="page-chat" class="page">
     <div class="container">
-      <h2>💬 Consulta a Gemini</h2>
-      <div class="chat-box" id="chatBox">
-        <div class="msg ia">¡Hola! Hazme cualquier consulta sobre el desempeño o las ventas registradas.</div>
-      </div>
-      <div style="display: flex; gap: 6px;">
-        <input type="text" id="chatInput" placeholder="Ej: ¿Por qué bajaron las ventas el martes?">
-        <button class="btn" style="width: 80px;" onclick="enviarMensajeChat()">Enviar</button>
+      <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Consulta Libre al Agente IA</h2>
+      <div class="chat-container">
+        <div class="chat-messages" id="chatBox">
+          <div class="msg ia">¡Hola! Soy tu asistente de operaciones. Pregúntame sobre el desempeño, bloqueos o actividades del equipo.</div>
+        </div>
+        <div class="chat-input-group">
+          <input type="text" id="chatInput" placeholder="Ej: ¿Qué actividades registré hoy?" onkeydown="if(event.key==='Enter') enviarConsultaChat()">
+          <button class="btn" onclick="enviarConsultaChat()">Enviar</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- NAVEGACIÓN INFERIOR -->
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="cambiarPestaña('registro')">📝 Registrar</button>
-    <button class="tab-btn" onclick="cambiarPestaña('dashboard')">📊 Dashboard</button>
-    <button class="tab-btn" onclick="cambiarPestaña('chat')">💬 Chat IA</button>
+    <button class="tab-btn active" onclick="cambiarTab('registro', this)">
+      <span>📝</span> Registrar
+    </button>
+    <button class="tab-btn" onclick="cambiarTab('dashboard', this)">
+      <span>📊</span> Dashboard
+    </button>
+    <button class="tab-btn" onclick="cambiarTab('chat', this)">
+      <span>💬</span> Chat IA
+    </button>
   </div>
 
 <script>
-  function cambiarPestaña(pestaña) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(`page-${pestaña}`).classList.add('active');
-    event.currentTarget.classList.add('active');
-  }
-
-  // Código de envío offline/online y conexión con Apps Script
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyB7zFaK_IEa_qeVfcwv_yvPG1XteOMDWqTh-RyAqr3ruRuolLMPn7-LrYnGepCEocg/exec";
 
-  document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
+  // Cargar datos al iniciar la app
+  document.addEventListener("DOMContentLoaded", () => {
+    // 1. Fecha de hoy por defecto
+    document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
 
-  function enviarMensajeChat() {
+    // 2. RECUPERAR NOMBRE Y CARGO GUARDADOS EN EL TELÉFONO
+    const savedNombre = localStorage.getItem("saved_nombre");
+    const savedCargo = localStorage.getItem("saved_cargo");
+    if (savedNombre) document.getElementById("nombre").value = savedNombre;
+    if (savedCargo) document.getElementById("cargo").value = savedCargo;
+
+    // 3. Monitorear estado de internet
+    actualizarEstadoConexion();
+    window.addEventListener('online', actualizarEstadoConexion);
+    window.addEventListener('offline', actualizarEstadoConexion);
+  });
+
+  function showToast(msj) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msj;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3000);
+  }
+
+  function cambiarTab(tabName, element) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`page-${tabName}`).classList.add('active');
+    element.classList.add('active');
+  }
+
+  function actualizarEstadoConexion() {
+    const badge = document.getElementById("connectionStatus");
+    if (navigator.onLine) {
+      badge.className = "status-badge online";
+      badge.innerText = "En línea";
+      sincronizarPendientes();
+    } else {
+      badge.className = "status-badge offline";
+      badge.innerText = "Modo Offline";
+    }
+  }
+
+  // ENVIAR REGISTRO
+  document.getElementById("activityForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const fecha = document.getElementById("fecha").value;
+    const nombre = document.getElementById("nombre").value.trim();
+    const cargo = document.getElementById("cargo").value.trim();
+    const actividad = document.getElementById("actividad").value.trim();
+
+    // GUARDAR NOMBRE Y CARGO LOCALMENTE PARA QUE QUEDEN PERMANENTES
+    localStorage.setItem("saved_nombre", nombre);
+    localStorage.setItem("saved_cargo", cargo);
+
+    const registro = { fecha, nombre, cargo, actividad };
+
+    if (!navigator.onLine) {
+      guardarLocalmente(registro);
+      showToast("📱 Guardado offline. Se enviará al reconectar.");
+      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+      return;
+    }
+
+    const btn = document.getElementById("btnSubmit");
+    btn.disabled = true;
+    btn.innerText = "Guardando...";
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registro)
+      });
+
+      showToast("✅ ¡Actividad registrada con éxito!");
+      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+    } catch (err) {
+      guardarLocalmente(registro);
+      showToast("⚠️ Error de red. Guardado localmente.");
+      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "💾 Guardar Actividad";
+    }
+  });
+
+  function guardarLocalmente(registro) {
+    const pendientes = JSON.parse(localStorage.getItem("pending_activities") || "[]");
+    pendientes.push(registro);
+    localStorage.setItem("pending_activities", JSON.stringify(pendientes));
+  }
+
+  async function sincronizarPendientes() {
+    const pendientes = JSON.parse(localStorage.getItem("pending_activities") || "[]");
+    if (pendientes.length === 0) return;
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pendientes)
+      });
+      localStorage.removeItem("pending_activities");
+      showToast(`🔄 Se sincronizaron ${pendientes.length} registros pendientes.`);
+    } catch (e) {
+      console.log("Error al sincronizar cola offline", e);
+    }
+  }
+
+  // PESTAÑA DASHBOARD
+  async function cargarDashboard() {
+    const output = document.getElementById("dashboardOutput");
+    output.innerText = "🤖 Consultando registros y calculando indicadores...";
+
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ accion: "dashboard" })
+      });
+      const text = await response.text();
+      output.innerText = text;
+    } catch (e) {
+      output.innerText = "❌ Error al conectar con la IA. Revisa tu conexión a internet.";
+    }
+  }
+
+  // PESTAÑA CHAT IA
+  async function enviarConsultaChat() {
     const input = document.getElementById("chatInput");
-    const msg = input.value.trim();
-    if (!msg) return;
+    const preg = input.value.trim();
+    if (!preg) return;
 
     const chatBox = document.getElementById("chatBox");
-    chatBox.innerHTML += `<div class="msg user">${msg}</div>`;
+    chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
     input.value = "";
     chatBox.scrollTop = chatBox.scrollHeight;
 
-    // Indicador de pensando
-    chatBox.innerHTML += `<div class="msg ia" id="loading">Analizando registros...</div>`;
+    const loadingId = "loading_" + Date.now();
+    chatBox.innerHTML += `<div class="msg ia" id="${loadingId}">Procesando respuesta...</div>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-    fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ accion: "chat", pregunta: msg })
-    })
-    .then(r => r.text())
-    .then(res => {
-      document.getElementById("loading").remove();
-      chatBox.innerHTML += `<div class="msg ia">${res}</div>`;
-      chatBox.scrollTop = chatBox.scrollHeight;
-    })
-    .catch(() => {
-      document.getElementById("loading").remove();
-      chatBox.innerHTML += `<div class="msg ia">Revisa tu conexión a internet para chatear.</div>`;
-    });
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ accion: "chat", pregunta: preg })
+      });
+      const text = await response.text();
+      document.getElementById(loadingId).innerText = text;
+    } catch (e) {
+      document.getElementById(loadingId).innerText = "❌ Error al consultar a Gemini.";
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
   }
 </script>
 
