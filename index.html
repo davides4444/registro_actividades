@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro Diario de Actividades</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f6f9; color: #333; padding: 20px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 480px; background: #ffffff; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    h1 { font-size: 1.4rem; color: #1e293b; margin-bottom: 8px; text-align: center; }
+    p.subtitle { font-size: 0.85rem; color: #64748b; text-align: center; margin-bottom: 20px; }
+    .status-banner { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-bottom: 20px; }
+    .online { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .offline { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    input[type="text"], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem; outline: none; background: #fafafa; }
+    input[type="text"]:focus, textarea:focus { border-color: #2563eb; background: #fff; }
+    textarea { resize: vertical; min-height: 110px; }
+    .hint { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+    button.btn-submit { width: 100%; padding: 14px; background-color: #2563eb; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); }
+    button.btn-submit:active { transform: scale(0.98); background-color: #1d4ed8; }
+    .sync-info { margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 0.8rem; color: #475569; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>📋 Registro de Actividades</h1>
+    <p class="subtitle">Funciona con y sin conexión a internet</p>
+
+    <div id="statusBanner" class="status-banner online">🟢 Conectado a Internet</div>
+
+    <form id="activityForm">
+      <div class="form-group">
+        <label for="nombre">Nombre Completo:</label>
+        <input type="text" id="nombre" placeholder="Ej. Juan Pérez" required>
+      </div>
+
+      <div class="form-group">
+        <label for="cargo">Cargo / Puesto:</label>
+        <input type="text" id="cargo" placeholder="Ej. Operador de Campo" required>
+      </div>
+
+      <div class="form-group">
+        <label for="actividad">Actividad Realizada:</label>
+        <textarea id="actividad" placeholder="Presiona el micrófono de tu teclado para dictar tu actividad..." required></textarea>
+        <p class="hint">💡 Tip: Usa el botón del micrófono de tu teclado móvil para dictar por voz sin internet.</p>
+      </div>
+
+      <button type="submit" class="btn-submit">💾 Guardar Registro</button>
+    </form>
+
+    <div class="sync-info" id="syncInfo">
+      Registros pendientes de envío: <b id="pendingCount">0</b>
+    </div>
+  </div>
+
+  <script>
+    // URL de conexión configurada con tu Google Apps Script
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcrWi6RNdYo-rMyaWi2-rn4H5stIEyEAIwCfMUAaLCAh06tpdyBTOdOcnVJFNZlfe3/exec";
+
+    const statusBanner = document.getElementById('statusBanner');
+    const pendingCountEl = document.getElementById('pendingCount');
+    const activityForm = document.getElementById('activityForm');
+
+    document.getElementById('nombre').value = localStorage.getItem('app_user_nombre') || '';
+    document.getElementById('cargo').value = localStorage.getItem('app_user_cargo') || '';
+
+    function updateOnlineStatus() {
+      if (navigator.onLine) {
+        statusBanner.textContent = "🟢 Conectado a Internet (Sincronización activa)";
+        statusBanner.className = "status-banner online";
+        syncPendingData();
+      } else {
+        statusBanner.textContent = "🔴 Modo Offline (Se guardará localmente)";
+        statusBanner.className = "status-banner offline";
+      }
+      updatePendingCount();
+    }
+
+    function getPendingRecords() { return JSON.parse(localStorage.getItem('app_pending_records') || '[]'); }
+    function savePendingRecords(records) { localStorage.setItem('app_pending_records', JSON.stringify(records)); updatePendingCount(); }
+    function updatePendingCount() { pendingCountEl.textContent = getPendingRecords().length; }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
+    activityForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('nombre').value.trim();
+      const cargo = document.getElementById('cargo').value.trim();
+      const actividad = document.getElementById('actividad').value.trim();
+      const fecha = new Date().toLocaleString("es-PE", { timeZone: "America/Lima" });
+
+      if (!nombre || !cargo || !actividad) return alert("Por favor completa todos los campos.");
+
+      localStorage.setItem('app_user_nombre', nombre);
+      localStorage.setItem('app_user_cargo', cargo);
+
+      const nuevoRegistro = { fecha, nombre, cargo, actividad };
+
+      if (navigator.onLine) {
+        enviarAGoogleSheets(nuevoRegistro);
+      } else {
+        guardarLocalmente(nuevoRegistro);
+      }
+      document.getElementById('actividad').value = '';
+    });
+
+    function guardarLocalmente(registro) {
+      const pending = getPendingRecords();
+      pending.push(registro);
+      savePendingRecords(pending);
+      alert("✅ Registro guardado localmente en tu celular. Se enviará cuando tengas señal.");
+    }
+
+    function enviarAGoogleSheets(registro) {
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registro)
+      })
+      .then(() => alert("✅ Registro subido con éxito a Google Sheets."))
+      .catch(() => guardarLocalmente(registro));
+    }
+
+    function syncPendingData() {
+      const pending = getPendingRecords();
+      if (pending.length === 0) return;
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pending)
+      })
+      .then(() => {
+        localStorage.removeItem('app_pending_records');
+        updatePendingCount();
+        alert("🔄 ¡Se sincronizaron automáticamente los registros guardados sin internet!");
+      })
+      .catch((err) => console.error("Error al sincronizar:", err));
+    }
+  </script>
+</body>
+</html>
