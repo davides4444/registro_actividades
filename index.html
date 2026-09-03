@@ -108,15 +108,23 @@
       color: #166534;
       border: 1px solid #bbf7d0;
     }
-    .status-error {
-      background-color: #fee2e2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
+    .status-pending {
+      background-color: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
     }
     .status-sending {
       background-color: #e0f2fe;
       color: #075985;
       border: 1px solid #bae6fd;
+    }
+    #pendingBadge {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #b45309;
+      font-weight: 600;
+      text-align: center;
+      display: none;
     }
   </style>
 </head>
@@ -153,35 +161,63 @@
   </form>
 
   <div id="statusMessage"></div>
+  <div id="pendingBadge"></div>
 </div>
 
 <script>
-  // URL de tu Web App desplegada
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyB7zFaK_IEa_qeVfcwv_yvPG1XteOMDWqTh-RyAqr3ruRuolLMPn7-LrYnGepCEocg/exec";
 
   document.addEventListener("DOMContentLoaded", () => {
-    // Establecer fecha de hoy por defecto
+    // Fecha de hoy por defecto
     const today = new Date().toISOString().split('T')[0];
     document.getElementById("fecha").value = today;
 
-    // Cargar automáticamente el último Nombre y Cargo guardados en el celular
+    // Recordar Nombre y Cargo
     if (localStorage.getItem("last_nombre")) {
       document.getElementById("nombre").value = localStorage.getItem("last_nombre");
     }
     if (localStorage.getItem("last_cargo")) {
       document.getElementById("cargo").value = localStorage.getItem("last_cargo");
     }
+
+    updatePendingBadge();
+
+    // Sincronizar automáticamente si se abre la app con conexión
+    if (navigator.onLine) {
+      syncPendingRecords();
+    }
   });
 
   const form = document.getElementById("activityForm");
   const submitBtn = document.getElementById("submitBtn");
   const statusMessage = document.getElementById("statusMessage");
+  const pendingBadge = document.getElementById("pendingBadge");
 
+  // Funciones de gestión de almacenamiento local
+  function getPendingRecords() {
+    return JSON.parse(localStorage.getItem("pending_records") || "[]");
+  }
+
+  function savePendingRecord(record) {
+    const pending = getPendingRecords();
+    pending.push(record);
+    localStorage.setItem("pending_records", JSON.stringify(pending));
+  }
+
+  function updatePendingBadge() {
+    const pending = getPendingRecords();
+    if (pending.length > 0) {
+      pendingBadge.textContent = `⚠️ Tienes ${pending.length} registro(s) pendiente(s) por enviar.`;
+      pendingBadge.style.display = "block";
+    } else {
+      pendingBadge.style.display = "none";
+    }
+  }
+
+  // Enviar formulario
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     submitBtn.disabled = true;
-    showStatus("Guardando en Google Sheets...", "status-sending");
 
     const data = {
       fecha: document.getElementById("fecha").value,
@@ -190,30 +226,71 @@
       actividad: document.getElementById("actividad").value
     };
 
-    // Recordar Nombre y Cargo en memoria local
     localStorage.setItem("last_nombre", data.nombre);
     localStorage.setItem("last_cargo", data.cargo);
+
+    // Si NO hay internet, guardar localmente de inmediato
+    if (!navigator.onLine) {
+      savePendingRecord(data);
+      showStatus("Sin conexión. Registro guardado (Pendiente de envío).", "status-pending");
+      document.getElementById("actividad").value = "";
+      updatePendingBadge();
+      submitBtn.disabled = false;
+      return;
+    }
+
+    // Si HAY internet, intentar enviar
+    showStatus("Guardando en Google Sheets...", "status-sending");
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(data)
+      });
+
+      showStatus("¡Registro guardado con éxito!", "status-success");
+      document.getElementById("actividad").value = "";
+
+    } catch (error) {
+      // Si falla el envio en red, guardar en cola
+      savePendingRecord(data);
+      showStatus("Fallo de red. Guardado localmente (Pendiente de envío).", "status-pending");
+      document.getElementById("actividad").value = "";
+      updatePendingBadge();
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  // Función para sincronizar pendientes acumulados
+  async function syncPendingRecords() {
+    const pending = getPendingRecords();
+    if (pending.length === 0) return;
+
+    showStatus(`Sincronizando ${pending.length} registro(s) pendiente(s)...`, "status-sending");
 
     try {
       await fetch(SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8"
-        },
-        body: JSON.stringify(data)
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(pending)
       });
 
-      showStatus("¡Registro guardado con éxito!", "status-success");
-      document.getElementById("actividad").value = ""; // Limpiar solo el texto de la actividad
+      // Limpiar cola si fue exitoso
+      localStorage.removeItem("pending_records");
+      updatePendingBadge();
+      showStatus(`¡${pending.length} registro(s) pendiente(s) sincronizado(s) con éxito!`, "status-success");
 
     } catch (error) {
-      console.error("Error:", error);
-      showStatus("Error de red. Verifica tu conexión.", "status-error");
-    } finally {
-      submitBtn.disabled = false;
+      console.error("Error al sincronizar pendientes:", error);
+      showStatus("Aún sin conexión. Se reintentará al recuperar red.", "status-pending");
     }
-  });
+  }
+
+  // Detectar automáticamente cuando vuelve el internet
+  window.addEventListener('online', syncPendingRecords);
 
   function showStatus(text, className) {
     statusMessage.textContent = text;
@@ -221,11 +298,11 @@
     statusMessage.style.display = "block";
   }
 
-  // Activar funciones PWA llamando a sw.js
+  // Registro del Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log("Service Worker registrado con éxito"))
+        .then(() => console.log("Service Worker registrado"))
         .catch((err) => console.error("Error al registrar SW:", err));
     });
   }
