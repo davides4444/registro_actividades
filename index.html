@@ -3,148 +3,239 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registro Diario de Actividades</title>
+  <title>Registro de Actividades</title>
+
+  <!-- Meta etiquetas para App Móvil (PWA) -->
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="data:application/manifest+json;utf8,{%22name%22:%22Registro%20de%20Actividades%22,%22short_name%22:%22Actividades%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22#ffffff%22,%22theme_color%22:%22#2563eb%22}">
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f4f6f9; color: #333; padding: 20px; display: flex; justify-content: center; }
-    .container { width: 100%; max-width: 480px; background: #ffffff; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-    h1 { font-size: 1.4rem; color: #1e293b; margin-bottom: 8px; text-align: center; }
-    p.subtitle { font-size: 0.85rem; color: #64748b; text-align: center; margin-bottom: 20px; }
-    .status-banner { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-bottom: 20px; }
-    .online { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-    .offline { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
-    input[type="text"], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem; outline: none; background: #fafafa; }
-    input[type="text"]:focus, textarea:focus { border-color: #2563eb; background: #fff; }
-    textarea { resize: vertical; min-height: 110px; }
-    .hint { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
-    button.btn-submit { width: 100%; padding: 14px; background-color: #2563eb; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); }
-    button.btn-submit:active { transform: scale(0.98); background-color: #1d4ed8; }
-    .sync-info { margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 0.8rem; color: #475569; text-align: center; }
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #f1f5f9;
+      color: #1e293b;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .app-card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 480px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      padding: 24px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 1.5rem;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .header p {
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #334155;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1rem;
+      background-color: #f8fafc;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      background-color: #ffffff;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-submit:hover {
+      background-color: #1d4ed8;
+    }
+    .btn-submit:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+    #statusMessage {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      text-align: center;
+      display: none;
+    }
+    .status-success {
+      background-color: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    .status-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    .status-sending {
+      background-color: #e0f2fe;
+      color: #075985;
+      border: 1px solid #bae6fd;
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>📋 Registro de Actividades</h1>
-    <p class="subtitle">Funciona con y sin conexión a internet</p>
-
-    <div id="statusBanner" class="status-banner online">🟢 Conectado a Internet</div>
-
-    <form id="activityForm">
-      <div class="form-group">
-        <label for="nombre">Nombre Completo:</label>
-        <input type="text" id="nombre" placeholder="Ej. Juan Pérez" required>
-      </div>
-
-      <div class="form-group">
-        <label for="cargo">Cargo / Puesto:</label>
-        <input type="text" id="cargo" placeholder="Ej. Operador de Campo" required>
-      </div>
-
-      <div class="form-group">
-        <label for="actividad">Actividad Realizada:</label>
-        <textarea id="actividad" placeholder="Presiona el micrófono de tu teclado para dictar tu actividad..." required></textarea>
-        <p class="hint">💡 Tip: Usa el botón del micrófono de tu teclado móvil para dictar por voz sin internet.</p>
-      </div>
-
-      <button type="submit" class="btn-submit">💾 Guardar Registro</button>
-    </form>
-
-    <div class="sync-info" id="syncInfo">
-      Registros pendientes de envío: <b id="pendingCount">0</b>
-    </div>
+<div class="app-card">
+  <div class="header">
+    <h1>Registro de Actividades</h1>
+    <p>Sincronización directa con Google Sheets</p>
   </div>
 
-  <script>
-    // URL de conexión configurada con tu Google Apps Script
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcrWi6RNdYo-rMyaWi2-rn4H5stIEyEAIwCfMUAaLCAh06tpdyBTOdOcnVJFNZlfe3/exec";
+  <form id="activityForm">
+    <div class="form-group">
+      <label for="fecha">Fecha</label>
+      <input type="date" id="fecha" name="fecha" required>
+    </div>
 
-    const statusBanner = document.getElementById('statusBanner');
-    const pendingCountEl = document.getElementById('pendingCount');
-    const activityForm = document.getElementById('activityForm');
+    <div class="form-group">
+      <label for="nombre">Nombre Completo</label>
+      <input type="text" id="nombre" name="nombre" placeholder="Ej. David Mamani" required>
+    </div>
 
-    document.getElementById('nombre').value = localStorage.getItem('app_user_nombre') || '';
-    document.getElementById('cargo').value = localStorage.getItem('app_user_cargo') || '';
+    <div class="form-group">
+      <label for="cargo">Cargo</label>
+      <input type="text" id="cargo" name="cargo" placeholder="Ej. Supervisor de Operaciones" required>
+    </div>
 
-    function updateOnlineStatus() {
-      if (navigator.onLine) {
-        statusBanner.textContent = "🟢 Conectado a Internet (Sincronización activa)";
-        statusBanner.className = "status-banner online";
-        syncPendingData();
-      } else {
-        statusBanner.textContent = "🔴 Modo Offline (Se guardará localmente)";
-        statusBanner.className = "status-banner offline";
-      }
-      updatePendingCount();
+    <div class="form-group">
+      <label for="actividad">Descripción de la Actividad</label>
+      <textarea id="actividad" name="actividad" placeholder="Escribe el detalle de la actividad realizada..." required></textarea>
+    </div>
+
+    <button type="submit" class="btn-submit" id="submitBtn">Enviar Registro</button>
+  </form>
+
+  <div id="statusMessage"></div>
+</div>
+
+<script>
+  // URL de tu Web App desplegada
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyB7zFaK_IEa_qeVfcwv_yvPG1XteOMDWqTh-RyAqr3ruRuolLMPn7-LrYnGepCEocg/exec";
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // Establecer fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("fecha").value = today;
+
+    // Cargar automáticamente el último Nombre y Cargo guardados en el celular
+    if (localStorage.getItem("last_nombre")) {
+      document.getElementById("nombre").value = localStorage.getItem("last_nombre");
     }
-
-    function getPendingRecords() { return JSON.parse(localStorage.getItem('app_pending_records') || '[]'); }
-    function savePendingRecords(records) { localStorage.setItem('app_pending_records', JSON.stringify(records)); updatePendingCount(); }
-    function updatePendingCount() { pendingCountEl.textContent = getPendingRecords().length; }
-
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    updateOnlineStatus();
-
-    activityForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const nombre = document.getElementById('nombre').value.trim();
-      const cargo = document.getElementById('cargo').value.trim();
-      const actividad = document.getElementById('actividad').value.trim();
-      const fecha = new Date().toLocaleString("es-PE", { timeZone: "America/Lima" });
-
-      if (!nombre || !cargo || !actividad) return alert("Por favor completa todos los campos.");
-
-      localStorage.setItem('app_user_nombre', nombre);
-      localStorage.setItem('app_user_cargo', cargo);
-
-      const nuevoRegistro = { fecha, nombre, cargo, actividad };
-
-      if (navigator.onLine) {
-        enviarAGoogleSheets(nuevoRegistro);
-      } else {
-        guardarLocalmente(nuevoRegistro);
-      }
-      document.getElementById('actividad').value = '';
-    });
-
-    function guardarLocalmente(registro) {
-      const pending = getPendingRecords();
-      pending.push(registro);
-      savePendingRecords(pending);
-      alert("✅ Registro guardado localmente en tu celular. Se enviará cuando tengas señal.");
+    if (localStorage.getItem("last_cargo")) {
+      document.getElementById("cargo").value = localStorage.getItem("last_cargo");
     }
+  });
 
-    function enviarAGoogleSheets(registro) {
-      fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(registro)
-      })
-      .then(() => alert("✅ Registro subido con éxito a Google Sheets."))
-      .catch(() => guardarLocalmente(registro));
+  const form = document.getElementById("activityForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const statusMessage = document.getElementById("statusMessage");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    submitBtn.disabled = true;
+    showStatus("Guardando en Google Sheets...", "status-sending");
+
+    const data = {
+      fecha: document.getElementById("fecha").value,
+      nombre: document.getElementById("nombre").value,
+      cargo: document.getElementById("cargo").value,
+      actividad: document.getElementById("actividad").value
+    };
+
+    // Recordar Nombre y Cargo en memoria local
+    localStorage.setItem("last_nombre", data.nombre);
+    localStorage.setItem("last_cargo", data.cargo);
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(data)
+      });
+
+      showStatus("¡Registro guardado con éxito!", "status-success");
+      document.getElementById("actividad").value = ""; // Limpiar solo el texto de la actividad
+
+    } catch (error) {
+      console.error("Error:", error);
+      showStatus("Error de red. Verifica tu conexión.", "status-error");
+    } finally {
+      submitBtn.disabled = false;
     }
+  });
 
-    function syncPendingData() {
-      const pending = getPendingRecords();
-      if (pending.length === 0) return;
+  function showStatus(text, className) {
+    statusMessage.textContent = text;
+    statusMessage.className = className;
+    statusMessage.style.display = "block";
+  }
 
-      fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pending)
-      })
-      .then(() => {
-        localStorage.removeItem('app_pending_records');
-        updatePendingCount();
-        alert("🔄 ¡Se sincronizaron automáticamente los registros guardados sin internet!");
-      })
-      .catch((err) => console.error("Error al sincronizar:", err));
-    }
-  </script>
+  // Activar funciones PWA
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      self.addEventListener('install', e => self.skipWaiting());
+      self.addEventListener('activate', e => self.clients.claim());
+      self.addEventListener('fetch', e => {
+        if (e.request.method === 'GET') {
+          e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+        }
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+  }
+</script>
+
 </body>
 </html>
