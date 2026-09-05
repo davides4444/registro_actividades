@@ -31,12 +31,12 @@
     .online { background: #dcfce7; color: #166534; }
     .offline { background: #fef3c7; color: #92400e; }
 
-    /* SKILLS UI (NUEVO) */
+    /* SKILLS UI (CHAT Y DASHBOARD) */
     .skills-container { margin-bottom: 12px; }
     .skills-title { font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
     .skills-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
-    .skill-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 20px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: #334155; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
-    .skill-btn.active { background: #2563eb; color: #ffffff; border-color: #2563eb; box-shadow: 0 2px 4px rgba(37,99,235,0.3); }
+    .skill-btn, .skill-dash-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 20px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: #334155; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
+    .skill-btn.active, .skill-dash-btn.active { background: #2563eb; color: #ffffff; border-color: #2563eb; box-shadow: 0 2px 4px rgba(37,99,235,0.3); }
 
     /* Chat UI */
     .chat-container { display: flex; flex-direction: column; height: 360px; }
@@ -101,13 +101,24 @@
     </div>
   </div>
 
-  <!-- PESTAÑA 2: DASHBOARD -->
+  <!-- PESTAÑA 2: DASHBOARD CON SKILLS -->
   <div id="page-dashboard" class="page">
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">📊 Dashboard e Indicadores IA</h2>
-      <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 12px;">Obtén un análisis automático con KPIs y gráfico visual de tus actividades.</p>
-      <button class="btn" onclick="cargarDashboard()">🔄 Generar / Actualizar Dashboard</button>
-      <div id="dashboardOutput" class="dashboard-content">Toca el botón superior para procesar las actividades registradas...</div>
+      
+      <!-- BOTONES DE SKILLS PARA EL DASHBOARD -->
+      <div class="skills-container">
+        <div class="skills-title">⚡ Tipo de Análisis (Skills Dashboard):</div>
+        <div class="skills-grid">
+          <button class="skill-dash-btn active" onclick="seleccionarSkillDash(this, 'general')">📊 General</button>
+          <button class="skill-dash-btn" onclick="seleccionarSkillDash(this, 'maquinas')">🧵 Por Máquina/SWF</button>
+          <button class="skill-dash-btn" onclick="seleccionarSkillDash(this, 'fallas')">🚨 Tipo de Falla</button>
+          <button class="skill-dash-btn" onclick="seleccionarSkillDash(this, 'productividad')">⏱️ Eficiencia</button>
+        </div>
+      </div>
+
+      <button class="btn" style="margin-top: 8px;" onclick="cargarDashboard()">🔄 Generar / Actualizar Dashboard</button>
+      <div id="dashboardOutput" class="dashboard-content">Selecciona un tipo de análisis arriba y presiona Generar...</div>
     </div>
   </div>
 
@@ -116,7 +127,7 @@
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Agente IA & Skills</h2>
       
-      <!-- BOTONES DE SKILLS -->
+      <!-- BOTONES DE SKILLS DEL CHAT -->
       <div class="skills-container">
         <div class="skills-title">⚡ Skills de IA (Selecciona una):</div>
         <div class="skills-grid">
@@ -155,7 +166,7 @@
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjFK38CvJVT5EyJSk6toxQjkUBpX_-R4dnu0CIqBptWodfT-CRS52ER-erfchpoDxQ/exec";
 
-  // DEFINICIÓN DE SKILLS Y PROMPTS DE ENTRENAMIENTO
+  // DEFINICIÓN DE SKILLS DEL CHAT
   const SKILLS = {
     resumen: "Analiza todas las actividades registradas hoy y genera un resumen ejecutivo breve en viñetas resaltando los logros principales.",
     bloqueos: "Identifica posibles cuellos de botella, problemas o retrasos mencionados en el registro de actividades y sugiere soluciones.",
@@ -163,10 +174,18 @@
     mejora: "Actúa como un consultor senior de procesos. Evalúa las tareas y entrega 3 recomendaciones accionables para optimizar el tiempo."
   };
 
+  // DEFINICIÓN DE ENTRENAMIENTO DE SKILLS PARA EL DASHBOARD
+  const DASHBOARD_SKILLS = {
+    general: "Agrupa las actividades registradas por tipo general de tarea (Mantenimiento, Ajustes, Operación, Inspección). Devuelve las categorías más frecuentes en labels y sus cantidades numéricas en data.",
+    maquinas: "Analiza las actividades e identifica las máquinas o componentes SWF mencionados (ejemplo: SWF Cabeza 1, Garfio, Freno, Remalladora). Devuelve en labels los componentes/máquinas y en data la cantidad de intervenciones.",
+    fallas: "Clasifica el nivel de gravedad de los eventos reportados (ejemplo: Paro Crítico, Falla Menor, Mantenimiento Rutinario, Ajuste Operativo). Devuelve en labels las clasificaciones de gravedad y en data el conteo.",
+    productividad: "Evalúa la distribución del tiempo y tipo de labor (ejemplo: Producción Activa, Tiempos Muertos, Reparaciones, Configuración). Devuelve en labels estas áreas y en data el número de registros asociados."
+  };
+
   let activeSkillKey = null;
+  let activeSkillDashKey = 'general';
 
   function seleccionarSkill(buttonElement, skillKey) {
-    // Si la skill ya está activa, la desactivamos
     if (activeSkillKey === skillKey) {
       activeSkillKey = null;
       buttonElement.classList.remove("active");
@@ -174,14 +193,11 @@
       return;
     }
 
-    // Desactivar otros botones
     document.querySelectorAll('.skill-btn').forEach(btn => btn.classList.remove('active'));
     
-    // Activar el botón seleccionado
     activeSkillKey = skillKey;
     buttonElement.classList.add("active");
     
-    // Auto-completar el input con una sugerencia según la skill
     const input = document.getElementById("chatInput");
     if (skillKey === 'resumen') input.value = "Genera un resumen del día";
     else if (skillKey === 'bloqueos') input.value = "¿Qué bloqueos o riesgos detectas?";
@@ -189,6 +205,13 @@
     else if (skillKey === 'mejora') input.value = "¿Cómo podemos optimizar estas tareas?";
     
     showToast(`⚡ Skill activa: ${buttonElement.innerText}`);
+  }
+
+  function seleccionarSkillDash(btnElement, skillKey) {
+    document.querySelectorAll('.skill-dash-btn').forEach(b => b.classList.remove('active'));
+    activeSkillDashKey = skillKey;
+    btnElement.classList.add('active');
+    showToast(`⚡ Análisis seleccionado: ${btnElement.innerText}`);
   }
 
   // --- INDEXEDDB Y PWA ---
@@ -380,7 +403,7 @@
     showToast("✨ Cola sincronizada correctamente.");
   }
 
-  // --- DASHBOARD ---
+  // --- DASHBOARD CON SKILLS ENVIADAS AL BACKEND ---
   async function cargarDashboard() {
     const output = document.getElementById("dashboardOutput");
 
@@ -389,16 +412,18 @@
       return;
     }
 
-    output.innerText = "🤖 Calculando indicadores e IA...";
+    output.innerText = "🤖 Calculando indicadores e IA según la Skill seleccionada...";
 
     const nombre = document.getElementById("nombre").value.trim();
     const cargo = document.getElementById("cargo").value.trim();
+    const skillPrompt = DASHBOARD_SKILLS[activeSkillDashKey] || DASHBOARD_SKILLS['general'];
 
     try {
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
         body: JSON.stringify({ 
           action: "dashboard",
+          skillPrompt: skillPrompt, // Envia la instruccion de entrenamiento para el Dashboard
           usuario: { nombre, cargo }
         })
       });
@@ -416,7 +441,7 @@
           labels: parsed.labels,
           datasets: [{
             data: parsed.data,
-            backgroundColor: ['#2563eb', '#38bdf8', '#f59e0b', '#ef4444', '#10b981']
+            backgroundColor: ['#2563eb', '#38bdf8', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6']
           }]
         },
         options: { plugins: { legend: { position: 'bottom' } } }
@@ -454,7 +479,6 @@
     const nombre = document.getElementById("nombre").value.trim();
     const cargo = document.getElementById("cargo").value.trim();
 
-    // Obtener la instrucción de la skill seleccionada
     const skillPrompt = activeSkillKey ? SKILLS[activeSkillKey] : "";
 
     chatBox.innerHTML += `<div class="msg user">${preg} ${activeSkillKey ? `<br><small><i>(Skill: ${activeSkillKey})</i></small>` : ''}</div>`;
@@ -471,7 +495,7 @@
         body: JSON.stringify({
           action: "enviarConsulta",
           pregunta: preg,
-          skillPrompt: skillPrompt, // Se adjunta la skill seleccionada
+          skillPrompt: skillPrompt,
           usuario: { nombre, cargo }
         })
       });
