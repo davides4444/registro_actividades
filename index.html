@@ -61,7 +61,6 @@
   <header>📌 Registro & Centro de Control IA</header>
   <div id="toast">Mensaje</div>
 
-  <!-- PESTAÑA 1: REGISTRO -->
   <div id="page-registro" class="page active">
     <div class="container">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -91,7 +90,6 @@
     </div>
   </div>
 
-  <!-- PESTAÑA 2: DASHBOARD -->
   <div id="page-dashboard" class="page">
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">📊 Dashboard e Indicadores IA</h2>
@@ -101,7 +99,6 @@
     </div>
   </div>
 
-  <!-- PESTAÑA 3: CHAT IA -->
   <div id="page-chat" class="page">
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Consulta Libre al Agente IA</h2>
@@ -117,7 +114,6 @@
     </div>
   </div>
 
-  <!-- NAVEGACIÓN INFERIOR -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="cambiarTab('registro', this)">
       <span>📝</span> Registrar
@@ -131,7 +127,8 @@
   </div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaTnra0M83tluVPh39y9w39CQU74dt553YLMSm2A8auQ5Y15kXcrQvjm3Gf_CZUyoL/exec";
+  // URL actualizada del nuevo despliegue de Apps Script
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjFK38CvJVT5EyJSk6toxQjkUBpX_-R4dnu0CIqBptWodfT-CRS52ER-erfchpoDxQ/exec";
 
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
@@ -242,7 +239,7 @@
     }
   }
 
-  // PESTAÑA DASHBOARD (Genera gráfico dinámico mediante QuickChart)
+  // PESTAÑA DASHBOARD
   async function cargarDashboard() {
     const output = document.getElementById("dashboardOutput");
     output.innerText = "🤖 Calculando indicadores y generando gráfico...";
