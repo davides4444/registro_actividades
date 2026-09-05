@@ -54,6 +54,9 @@
     /* Toast Flotante */
     #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 2000; }
     #toast.show { opacity: 1; }
+
+    /* Indicador de Cola Offline */
+    .pending-count { font-size: 0.8rem; color: #d97706; font-weight: 600; margin-top: 4px; text-align: center; }
   </style>
 </head>
 <body>
@@ -61,6 +64,7 @@
   <header>📌 Registro & Centro de Control IA</header>
   <div id="toast">Mensaje</div>
 
+  <!-- PESTAÑA 1: REGISTRO -->
   <div id="page-registro" class="page active">
     <div class="container">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -86,10 +90,12 @@
           <textarea id="actividad" placeholder="Escribe aquí lo que realizaste..." required></textarea>
         </div>
         <button type="submit" class="btn" id="btnSubmit">💾 Guardar Actividad</button>
+        <div id="pendingCounter" class="pending-count"></div>
       </form>
     </div>
   </div>
 
+  <!-- PESTAÑA 2: DASHBOARD -->
   <div id="page-dashboard" class="page">
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">📊 Dashboard e Indicadores IA</h2>
@@ -99,6 +105,7 @@
     </div>
   </div>
 
+  <!-- PESTAÑA 3: CHAT IA -->
   <div id="page-chat" class="page">
     <div class="container">
       <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Consulta Libre al Agente IA</h2>
@@ -114,6 +121,7 @@
     </div>
   </div>
 
+  <!-- NAVEGACIÓN INFERIOR -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="cambiarTab('registro', this)">
       <span>📝</span> Registrar
@@ -127,21 +135,111 @@
   </div>
 
 <script>
-  // URL actualizada del nuevo despliegue de Apps Script
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjFK38CvJVT5EyJSk6toxQjkUBpX_-R4dnu0CIqBptWodfT-CRS52ER-erfchpoDxQ/exec";
 
+  // --- MOTOR DE BASE DE DATOS LOCAL INDEXEDDB (OFLLINE STORAGE) ---
+  const DB_NAME = "pwa_activities_db";
+  const DB_VERSION = 1;
+  const STORE_NAME = "pending_queue";
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function guardarRegistroIndexedDB(payload) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.add({ ...payload, timestamp: Date.now() });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function obtenerRegistrosPendientesDB() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function borrarRegistroIndexedDB(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // --- INICIALIZACIÓN ---
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
 
-    const savedNombre = localStorage.getItem("saved_nombre");
-    const savedCargo = localStorage.getItem("saved_cargo");
-    if (savedNombre) document.getElementById("nombre").value = savedNombre;
-    if (savedCargo) document.getElementById("cargo").value = savedCargo;
+    // Cargar datos persistentes de usuario
+    cargarDatosUsuarioGuardados();
 
     actualizarEstadoConexion();
     window.addEventListener('online', actualizarEstadoConexion);
     window.addEventListener('offline', actualizarEstadoConexion);
+    actualizarContadorPendientes();
+
+    // Registrar Service Worker para soporte offline PWA
+    registrarServiceWorker();
   });
+
+  function registrarServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'app-cache-v1';
+        self.addEventListener('install', e => {
+          self.skipWaiting();
+        });
+        self.addEventListener('activate', e => {
+          self.clients.claim();
+        });
+        self.addEventListener('fetch', e => {
+          if (e.request.method !== 'GET') return;
+          e.respondWith(
+            fetch(e.request).catch(() => caches.match(e.request))
+          );
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed', err));
+    }
+  }
+
+  function cargarDatosUsuarioGuardados() {
+    const savedNombre = localStorage.getItem("saved_nombre");
+    const savedCargo = localStorage.getItem("saved_cargo");
+
+    if (savedNombre) document.getElementById("nombre").value = savedNombre;
+    if (savedCargo) document.getElementById("cargo").value = savedCargo;
+  }
+
+  function guardarDatosUsuario(nombre, cargo) {
+    localStorage.setItem("saved_nombre", nombre);
+    localStorage.setItem("saved_cargo", cargo);
+  }
 
   function showToast(msj) {
     const toast = document.getElementById("toast");
@@ -169,6 +267,17 @@
     }
   }
 
+  async function actualizarContadorPendientes() {
+    const pendientes = await obtenerRegistrosPendientesDB();
+    const container = document.getElementById("pendingCounter");
+    if (pendientes.length > 0) {
+      container.innerText = `📦 ${pendientes.length} registro(s) pendiente(s) por sincronizar en la cola offline.`;
+    } else {
+      container.innerText = "";
+    }
+  }
+
+  // --- ENVÍO Y GUARDADO DE REGISTROS ---
   document.getElementById("activityForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -177,8 +286,8 @@
     const cargo = document.getElementById("cargo").value.trim();
     const actividad = document.getElementById("actividad").value.trim();
 
-    localStorage.setItem("saved_nombre", nombre);
-    localStorage.setItem("saved_cargo", cargo);
+    // Guardado persistente de datos del usuario
+    guardarDatosUsuario(nombre, cargo);
 
     const payload = {
       action: "registrarActividad",
@@ -186,13 +295,16 @@
       usuario: { nombre, cargo, fecha }
     };
 
+    // MODO OFFLINE DETECTADO
     if (!navigator.onLine) {
-      guardarLocalmente(payload);
-      showToast("📱 Guardado offline. Se enviará al reconectar.");
+      await guardarRegistroIndexedDB(payload);
+      showToast("📦 Actividad guardada en caché local (Offline)");
       document.getElementById("actividad").value = "";
+      actualizarContadorPendientes();
       return;
     }
 
+    // MODO ONLINE
     const btn = document.getElementById("btnSubmit");
     btn.disabled = true;
     btn.innerText = "Guardando...";
@@ -206,42 +318,58 @@
       showToast("✅ ¡Actividad registrada con éxito!");
       document.getElementById("actividad").value = "";
     } catch (err) {
-      guardarLocalmente(payload);
-      showToast("⚠️ Error de red. Guardado localmente.");
+      // Fallback a offline si hay falla de red intermitente
+      await guardarRegistroIndexedDB(payload);
+      showToast("⚠️ Conexión inestable. Guardado en la cola local.");
       document.getElementById("actividad").value = "";
+      actualizarContadorPendientes();
     } finally {
       btn.disabled = false;
       btn.innerText = "💾 Guardar Actividad";
     }
   });
 
-  function guardarLocalmente(registro) {
-    const pendientes = JSON.parse(localStorage.getItem("pending_activities") || "[]");
-    pendientes.push(registro);
-    localStorage.setItem("pending_activities", JSON.stringify(pendientes));
-  }
-
+  // --- SINCRONIZACIÓN AUTOMÁTICA EN SEGUNDO PLANO ---
   async function sincronizarPendientes() {
-    const pendientes = JSON.parse(localStorage.getItem("pending_activities") || "[]");
+    const pendientes = await obtenerRegistrosPendientesDB();
     if (pendientes.length === 0) return;
 
-    try {
-      for (const item of pendientes) {
+    showToast(`🔄 Sincronizando ${pendientes.length} registro(s) en cola...`);
+
+    for (const item of pendientes) {
+      try {
+        const payloadToSend = {
+          action: item.action,
+          actividadText: item.actividadText,
+          usuario: item.usuario
+        };
+
         await fetch(SCRIPT_URL, {
           method: "POST",
-          body: JSON.stringify(item)
+          body: JSON.stringify(payloadToSend)
         });
+
+        // Eliminar de IndexedDB si el envío fue exitoso
+        await borrarRegistroIndexedDB(item.id);
+      } catch (e) {
+        console.log("Reintento fallido de envío offline para item", item.id);
+        break; // Detener reintentos si vuelve a fallar la conexión
       }
-      localStorage.removeItem("pending_activities");
-      showToast(`🔄 Se sincronizaron ${pendientes.length} registros pendientes.`);
-    } catch (e) {
-      console.log("Error al sincronizar cola offline", e);
     }
+
+    actualizarContadorPendientes();
+    showToast("✨ ¡Cola offline sincronizada correctamente!");
   }
 
-  // PESTAÑA DASHBOARD
+  // --- DASHBOARD ---
   async function cargarDashboard() {
     const output = document.getElementById("dashboardOutput");
+
+    if (!navigator.onLine) {
+      output.innerText = "⚠️ La generación del Dashboard e Indicadores IA requiere conexión a Internet.";
+      return;
+    }
+
     output.innerText = "🤖 Calculando indicadores y generando gráfico...";
 
     const nombre = document.getElementById("nombre").value.trim();
@@ -295,16 +423,25 @@
     }
   }
 
-  // PESTAÑA CHAT IA
+  // --- CHAT IA ---
   async function enviarConsultaChat() {
     const input = document.getElementById("chatInput");
     const preg = input.value.trim();
     if (!preg) return;
 
+    const chatBox = document.getElementById("chatBox");
+
+    if (!navigator.onLine) {
+      chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
+      chatBox.innerHTML += `<div class="msg ia">⚠️ El asistente de IA requiere conexión a internet activa para responder.</div>`;
+      input.value = "";
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return;
+    }
+
     const nombre = document.getElementById("nombre").value.trim();
     const cargo = document.getElementById("cargo").value.trim();
 
-    const chatBox = document.getElementById("chatBox");
     chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
     input.value = "";
     chatBox.scrollTop = chatBox.scrollHeight;
