@@ -31,8 +31,15 @@
     .online { background: #dcfce7; color: #166534; }
     .offline { background: #fef3c7; color: #92400e; }
 
+    /* SKILLS UI (NUEVO) */
+    .skills-container { margin-bottom: 12px; }
+    .skills-title { font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
+    .skills-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+    .skill-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 20px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: #334155; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
+    .skill-btn.active { background: #2563eb; color: #ffffff; border-color: #2563eb; box-shadow: 0 2px 4px rgba(37,99,235,0.3); }
+
     /* Chat UI */
-    .chat-container { display: flex; flex-direction: column; height: 350px; }
+    .chat-container { display: flex; flex-direction: column; height: 360px; }
     .chat-messages { flex: 1; overflow-y: auto; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; margin-bottom: 10px; }
     .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; margin-bottom: 8px; word-wrap: break-word; }
     .msg.user { background: #2563eb; color: #fff; margin-left: auto; border-bottom-right-radius: 2px; }
@@ -104,16 +111,28 @@
     </div>
   </div>
 
-  <!-- PESTAÑA 3: CHAT IA -->
+  <!-- PESTAÑA 3: CHAT IA CON SKILLS -->
   <div id="page-chat" class="page">
     <div class="container">
-      <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Consulta Libre al Agente IA</h2>
+      <h2 style="font-size: 1.1rem; margin-bottom: 8px;">💬 Agente IA & Skills</h2>
+      
+      <!-- BOTONES DE SKILLS -->
+      <div class="skills-container">
+        <div class="skills-title">⚡ Skills de IA (Selecciona una):</div>
+        <div class="skills-grid">
+          <button class="skill-btn" onclick="seleccionarSkill(this, 'resumen')">📋 Resumen Ejecutivo</button>
+          <button class="skill-btn" onclick="seleccionarSkill(this, 'bloqueos')">🚨 Detectar Bloqueos</button>
+          <button class="skill-btn" onclick="seleccionarSkill(this, 'kpis')">📈 Calcular KPIs</button>
+          <button class="skill-btn" onclick="seleccionarSkill(this, 'mejora')">💡 Sugerir Mejora</button>
+        </div>
+      </div>
+
       <div class="chat-container">
         <div class="chat-messages" id="chatBox">
-          <div class="msg ia">¡Hola! Soy tu asistente de operaciones. Pregúntame sobre el desempeño, bloqueos o actividades del equipo.</div>
+          <div class="msg ia">¡Hola! Selecciona una Skill arriba o hazme cualquier consulta sobre tus actividades.</div>
         </div>
         <div class="chat-input-group">
-          <input type="text" id="chatInput" placeholder="Ej: ¿Qué actividades registré hoy?" onkeydown="if(event.key==='Enter') enviarConsultaChat()">
+          <input type="text" id="chatInput" placeholder="Escribe tu consulta..." onkeydown="if(event.key==='Enter') enviarConsultaChat()">
           <button class="btn" onclick="enviarConsultaChat()">Enviar</button>
         </div>
       </div>
@@ -136,7 +155,43 @@
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjFK38CvJVT5EyJSk6toxQjkUBpX_-R4dnu0CIqBptWodfT-CRS52ER-erfchpoDxQ/exec";
 
-  // --- INDEXEDDB PARA ALMACENAMIENTO DE COLA OFFLINE ---
+  // DEFINICIÓN DE SKILLS Y PROMPTS DE ENTRENAMIENTO
+  const SKILLS = {
+    resumen: "Analiza todas las actividades registradas hoy y genera un resumen ejecutivo breve en viñetas resaltando los logros principales.",
+    bloqueos: "Identifica posibles cuellos de botella, problemas o retrasos mencionados en el registro de actividades y sugiere soluciones.",
+    kpis: "Calcula los KPIs clave de productividad del equipo basándote en el volumen y tipo de actividades registradas.",
+    mejora: "Actúa como un consultor senior de procesos. Evalúa las tareas y entrega 3 recomendaciones accionables para optimizar el tiempo."
+  };
+
+  let activeSkillKey = null;
+
+  function seleccionarSkill(buttonElement, skillKey) {
+    // Si la skill ya está activa, la desactivamos
+    if (activeSkillKey === skillKey) {
+      activeSkillKey = null;
+      buttonElement.classList.remove("active");
+      showToast("Skill desactivada");
+      return;
+    }
+
+    // Desactivar otros botones
+    document.querySelectorAll('.skill-btn').forEach(btn => btn.classList.remove('active'));
+    
+    // Activar el botón seleccionado
+    activeSkillKey = skillKey;
+    buttonElement.classList.add("active");
+    
+    // Auto-completar el input con una sugerencia según la skill
+    const input = document.getElementById("chatInput");
+    if (skillKey === 'resumen') input.value = "Genera un resumen del día";
+    else if (skillKey === 'bloqueos') input.value = "¿Qué bloqueos o riesgos detectas?";
+    else if (skillKey === 'kpis') input.value = "Muestra los indicadores del periodo";
+    else if (skillKey === 'mejora') input.value = "¿Cómo podemos optimizar estas tareas?";
+    
+    showToast(`⚡ Skill activa: ${buttonElement.innerText}`);
+  }
+
+  // --- INDEXEDDB Y PWA ---
   const DB_NAME = "pwa_activities_db";
   const DB_VERSION = 1;
   const STORE_NAME = "pending_queue";
@@ -191,7 +246,6 @@
   // --- INICIALIZACIÓN ---
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
-
     cargarDatosUsuarioGuardados();
 
     actualizarEstadoConexion();
@@ -199,18 +253,14 @@
     window.addEventListener('offline', actualizarEstadoConexion);
     actualizarContadorPendientes();
 
-    // Registrar Service Worker desde archivo físico sw.js
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service Worker registrado correctamente.'))
-        .catch(err => console.log('Error al registrar Service Worker:', err));
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Error:', err));
     }
   });
 
   function cargarDatosUsuarioGuardados() {
     const savedNombre = localStorage.getItem("saved_nombre");
     const savedCargo = localStorage.getItem("saved_cargo");
-
     if (savedNombre) document.getElementById("nombre").value = savedNombre;
     if (savedCargo) document.getElementById("cargo").value = savedCargo;
   }
@@ -304,35 +354,30 @@
     }
   });
 
-  // --- SINCRONIZACIÓN AUTOMÁTICA ---
   async function sincronizarPendientes() {
     const pendientes = await obtenerRegistrosPendientesDB();
     if (pendientes.length === 0) return;
 
-    showToast(`🔄 Sincronizando ${pendientes.length} registro(s) en cola...`);
+    showToast(`🔄 Sincronizando ${pendientes.length} registro(s)...`);
 
     for (const item of pendientes) {
       try {
-        const payloadToSend = {
-          action: item.action,
-          actividadText: item.actividadText,
-          usuario: item.usuario
-        };
-
         await fetch(SCRIPT_URL, {
           method: "POST",
-          body: JSON.stringify(payloadToSend)
+          body: JSON.stringify({
+            action: item.action,
+            actividadText: item.actividadText,
+            usuario: item.usuario
+          })
         });
-
         await borrarRegistroIndexedDB(item.id);
       } catch (e) {
-        console.log("Error al sincronizar item", item.id);
         break;
       }
     }
 
     actualizarContadorPendientes();
-    showToast("✨ ¡Cola offline sincronizada correctamente!");
+    showToast("✨ Cola sincronizada correctamente.");
   }
 
   // --- DASHBOARD ---
@@ -344,7 +389,7 @@
       return;
     }
 
-    output.innerText = "🤖 Calculando indicadores y generando gráfico...";
+    output.innerText = "🤖 Calculando indicadores e IA...";
 
     const nombre = document.getElementById("nombre").value.trim();
     const cargo = document.getElementById("cargo").value.trim();
@@ -359,14 +404,12 @@
       });
       
       const data = await response.json();
-      
       if (!data.success) {
         output.innerText = "❌ Error: " + (data.error || "No se pudo generar el dashboard.");
         return;
       }
 
       const parsed = data.datos;
-
       const chartConfig = {
         type: 'doughnut',
         data: {
@@ -376,11 +419,7 @@
             backgroundColor: ['#2563eb', '#38bdf8', '#f59e0b', '#ef4444', '#10b981']
           }]
         },
-        options: {
-          plugins: {
-            legend: { position: 'bottom' }
-          }
-        }
+        options: { plugins: { legend: { position: 'bottom' } } }
       };
 
       const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&w=400&h=220&bkg=white`;
@@ -391,13 +430,12 @@
           <img src="${chartUrl}" alt="Gráfico de Métricas" style="max-width: 100%; border-radius: 8px; border: 1px solid #cbd5e1;">
         </div>
       `;
-
     } catch (e) {
-      output.innerText = "❌ Error al generar el gráfico. Revisa tu conexión.";
+      output.innerText = "❌ Error al generar el gráfico.";
     }
   }
 
-  // --- CHAT IA ---
+  // --- CHAT IA CON ENVÍO DE SKILLS ---
   async function enviarConsultaChat() {
     const input = document.getElementById("chatInput");
     const preg = input.value.trim();
@@ -407,7 +445,7 @@
 
     if (!navigator.onLine) {
       chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
-      chatBox.innerHTML += `<div class="msg ia">⚠️ El asistente de IA requiere conexión a internet.</div>`;
+      chatBox.innerHTML += `<div class="msg ia">⚠️ Requiere conexión a internet.</div>`;
       input.value = "";
       chatBox.scrollTop = chatBox.scrollHeight;
       return;
@@ -416,12 +454,15 @@
     const nombre = document.getElementById("nombre").value.trim();
     const cargo = document.getElementById("cargo").value.trim();
 
-    chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
+    // Obtener la instrucción de la skill seleccionada
+    const skillPrompt = activeSkillKey ? SKILLS[activeSkillKey] : "";
+
+    chatBox.innerHTML += `<div class="msg user">${preg} ${activeSkillKey ? `<br><small><i>(Skill: ${activeSkillKey})</i></small>` : ''}</div>`;
     input.value = "";
     chatBox.scrollTop = chatBox.scrollHeight;
 
     const loadingId = "loading_" + Date.now();
-    chatBox.innerHTML += `<div class="msg ia" id="${loadingId}">Procesando respuesta...</div>`;
+    chatBox.innerHTML += `<div class="msg ia" id="${loadingId}">Procesando con la IA...</div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
 
     try {
@@ -430,19 +471,19 @@
         body: JSON.stringify({
           action: "enviarConsulta",
           pregunta: preg,
+          skillPrompt: skillPrompt, // Se adjunta la skill seleccionada
           usuario: { nombre, cargo }
         })
       });
       
       const data = await response.json();
-      
       if (data.success && data.respuesta) {
-        document.getElementById(loadingId).innerText = data.respuesta;
+        document.getElementById(loadingId).innerHTML = data.respuesta.replace(/\n/g, '<br>');
       } else {
         document.getElementById(loadingId).innerText = "❌ Error: " + (data.error || "Sin respuesta");
       }
     } catch (e) {
-      document.getElementById(loadingId).innerText = "❌ Error de conexión con el agente.";
+      document.getElementById(loadingId).innerText = "❌ Error de conexión con la IA.";
     }
     chatBox.scrollTop = chatBox.scrollHeight;
   }
