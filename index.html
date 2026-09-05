@@ -131,20 +131,17 @@
   </div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyB7zFaK_IEa_qeVfcwv_yvPG1XteOMDWqTh-RyAqr3ruRuolLMPn7-LrYnGepCEocg/exec";
+  // URL actualizada de tu Web App en Google Apps Script
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaTnra0M83tluVPh39y9w39CQU74dt553YLMSm2A8auQ5Y15kXcrQvjm3Gf_CZUyoL/exec";
 
-  // Cargar datos al iniciar la app
   document.addEventListener("DOMContentLoaded", () => {
-    // 1. Fecha de hoy por defecto
     document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
 
-    // 2. RECUPERAR NOMBRE Y CARGO GUARDADOS EN EL TELÉFONO
     const savedNombre = localStorage.getItem("saved_nombre");
     const savedCargo = localStorage.getItem("saved_cargo");
     if (savedNombre) document.getElementById("nombre").value = savedNombre;
     if (savedCargo) document.getElementById("cargo").value = savedCargo;
 
-    // 3. Monitorear estado de internet
     actualizarEstadoConexion();
     window.addEventListener('online', actualizarEstadoConexion);
     window.addEventListener('offline', actualizarEstadoConexion);
@@ -176,7 +173,7 @@
     }
   }
 
-  // ENVIAR REGISTRO
+  // ENVIAR REGISTRO DE ACTIVIDAD
   document.getElementById("activityForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -185,16 +182,19 @@
     const cargo = document.getElementById("cargo").value.trim();
     const actividad = document.getElementById("actividad").value.trim();
 
-    // GUARDAR NOMBRE Y CARGO LOCALMENTE PARA QUE QUEDEN PERMANENTES
     localStorage.setItem("saved_nombre", nombre);
     localStorage.setItem("saved_cargo", cargo);
 
-    const registro = { fecha, nombre, cargo, actividad };
+    const payload = {
+      action: "registrarActividad",
+      actividadText: actividad,
+      usuario: { nombre, cargo, fecha }
+    };
 
     if (!navigator.onLine) {
-      guardarLocalmente(registro);
+      guardarLocalmente(payload);
       showToast("📱 Guardado offline. Se enviará al reconectar.");
-      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+      document.getElementById("actividad").value = "";
       return;
     }
 
@@ -205,17 +205,15 @@
     try {
       await fetch(SCRIPT_URL, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registro)
+        body: JSON.stringify(payload)
       });
 
       showToast("✅ ¡Actividad registrada con éxito!");
-      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+      document.getElementById("actividad").value = "";
     } catch (err) {
-      guardarLocalmente(registro);
+      guardarLocalmente(payload);
       showToast("⚠️ Error de red. Guardado localmente.");
-      document.getElementById("actividad").value = ""; // SOLO LIMPIA LA ACTIVIDAD
+      document.getElementById("actividad").value = "";
     } finally {
       btn.disabled = false;
       btn.innerText = "💾 Guardar Actividad";
@@ -233,12 +231,12 @@
     if (pendientes.length === 0) return;
 
     try {
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pendientes)
-      });
+      for (const item of pendientes) {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify(item)
+        });
+      }
       localStorage.removeItem("pending_activities");
       showToast(`🔄 Se sincronizaron ${pendientes.length} registros pendientes.`);
     } catch (e) {
@@ -251,23 +249,33 @@
     const output = document.getElementById("dashboardOutput");
     output.innerText = "🤖 Consultando registros y calculando indicadores...";
 
+    const nombre = document.getElementById("nombre").value.trim();
+    const cargo = document.getElementById("cargo").value.trim();
+
     try {
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify({ accion: "dashboard" })
+        body: JSON.stringify({ 
+          action: "enviarConsulta", 
+          pregunta: "Genera un resumen analítico con KPIs de las últimas actividades del taller.",
+          usuario: { nombre, cargo }
+        })
       });
-      const text = await response.text();
-      output.innerText = text;
+      const data = await response.json();
+      output.innerText = data.respuesta || "No se pudo generar el dashboard.";
     } catch (e) {
       output.innerText = "❌ Error al conectar con la IA. Revisa tu conexión a internet.";
     }
   }
 
-  // PESTAÑA CHAT IA
+  // PESTAÑA CHAT IA (Actualizada para procesar JSON de Groq)
   async function enviarConsultaChat() {
     const input = document.getElementById("chatInput");
     const preg = input.value.trim();
     if (!preg) return;
+
+    const nombre = document.getElementById("nombre").value.trim();
+    const cargo = document.getElementById("cargo").value.trim();
 
     const chatBox = document.getElementById("chatBox");
     chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
@@ -281,12 +289,22 @@
     try {
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify({ accion: "chat", pregunta: preg })
+        body: JSON.stringify({
+          action: "enviarConsulta",
+          pregunta: preg,
+          usuario: { nombre, cargo }
+        })
       });
-      const text = await response.text();
-      document.getElementById(loadingId).innerText = text;
+      
+      const data = await response.json();
+      
+      if (data.success && data.respuesta) {
+        document.getElementById(loadingId).innerText = data.respuesta;
+      } else {
+        document.getElementById(loadingId).innerText = "❌ Error: " + (data.error || "Sin respuesta");
+      }
     } catch (e) {
-      document.getElementById(loadingId).innerText = "❌ Error al consultar a Gemini.";
+      document.getElementById(loadingId).innerText = "❌ Error de conexión con el agente.";
     }
     chatBox.scrollTop = chatBox.scrollHeight;
   }
