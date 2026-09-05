@@ -55,7 +55,6 @@
     #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 2000; }
     #toast.show { opacity: 1; }
 
-    /* Indicador de Cola Offline */
     .pending-count { font-size: 0.8rem; color: #d97706; font-weight: 600; margin-top: 4px; text-align: center; }
   </style>
 </head>
@@ -137,7 +136,7 @@
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjFK38CvJVT5EyJSk6toxQjkUBpX_-R4dnu0CIqBptWodfT-CRS52ER-erfchpoDxQ/exec";
 
-  // --- MOTOR DE BASE DE DATOS LOCAL INDEXEDDB (OFLLINE STORAGE) ---
+  // --- INDEXEDDB PARA ALMACENAMIENTO DE COLA OFFLINE ---
   const DB_NAME = "pwa_activities_db";
   const DB_VERSION = 1;
   const STORE_NAME = "pending_queue";
@@ -193,7 +192,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
 
-    // Cargar datos persistentes de usuario
     cargarDatosUsuarioGuardados();
 
     actualizarEstadoConexion();
@@ -201,32 +199,13 @@
     window.addEventListener('offline', actualizarEstadoConexion);
     actualizarContadorPendientes();
 
-    // Registrar Service Worker para soporte offline PWA
-    registrarServiceWorker();
-  });
-
-  function registrarServiceWorker() {
+    // Registrar Service Worker desde archivo físico sw.js
     if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE_NAME = 'app-cache-v1';
-        self.addEventListener('install', e => {
-          self.skipWaiting();
-        });
-        self.addEventListener('activate', e => {
-          self.clients.claim();
-        });
-        self.addEventListener('fetch', e => {
-          if (e.request.method !== 'GET') return;
-          e.respondWith(
-            fetch(e.request).catch(() => caches.match(e.request))
-          );
-        });
-      `;
-      const blob = new Blob([swCode], { type: 'application/javascript' });
-      const swUrl = URL.createObjectURL(blob);
-      navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed', err));
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service Worker registrado correctamente.'))
+        .catch(err => console.log('Error al registrar Service Worker:', err));
     }
-  }
+  });
 
   function cargarDatosUsuarioGuardados() {
     const savedNombre = localStorage.getItem("saved_nombre");
@@ -271,13 +250,13 @@
     const pendientes = await obtenerRegistrosPendientesDB();
     const container = document.getElementById("pendingCounter");
     if (pendientes.length > 0) {
-      container.innerText = `📦 ${pendientes.length} registro(s) pendiente(s) por sincronizar en la cola offline.`;
+      container.innerText = `📦 ${pendientes.length} registro(s) pendiente(s) por sincronizar.`;
     } else {
       container.innerText = "";
     }
   }
 
-  // --- ENVÍO Y GUARDADO DE REGISTROS ---
+  // --- ENVÍO DE REGISTROS ---
   document.getElementById("activityForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -286,7 +265,6 @@
     const cargo = document.getElementById("cargo").value.trim();
     const actividad = document.getElementById("actividad").value.trim();
 
-    // Guardado persistente de datos del usuario
     guardarDatosUsuario(nombre, cargo);
 
     const payload = {
@@ -295,7 +273,6 @@
       usuario: { nombre, cargo, fecha }
     };
 
-    // MODO OFFLINE DETECTADO
     if (!navigator.onLine) {
       await guardarRegistroIndexedDB(payload);
       showToast("📦 Actividad guardada en caché local (Offline)");
@@ -304,7 +281,6 @@
       return;
     }
 
-    // MODO ONLINE
     const btn = document.getElementById("btnSubmit");
     btn.disabled = true;
     btn.innerText = "Guardando...";
@@ -318,9 +294,8 @@
       showToast("✅ ¡Actividad registrada con éxito!");
       document.getElementById("actividad").value = "";
     } catch (err) {
-      // Fallback a offline si hay falla de red intermitente
       await guardarRegistroIndexedDB(payload);
-      showToast("⚠️ Conexión inestable. Guardado en la cola local.");
+      showToast("⚠️ Conexión inestable. Guardado en cola local.");
       document.getElementById("actividad").value = "";
       actualizarContadorPendientes();
     } finally {
@@ -329,7 +304,7 @@
     }
   });
 
-  // --- SINCRONIZACIÓN AUTOMÁTICA EN SEGUNDO PLANO ---
+  // --- SINCRONIZACIÓN AUTOMÁTICA ---
   async function sincronizarPendientes() {
     const pendientes = await obtenerRegistrosPendientesDB();
     if (pendientes.length === 0) return;
@@ -349,11 +324,10 @@
           body: JSON.stringify(payloadToSend)
         });
 
-        // Eliminar de IndexedDB si el envío fue exitoso
         await borrarRegistroIndexedDB(item.id);
       } catch (e) {
-        console.log("Reintento fallido de envío offline para item", item.id);
-        break; // Detener reintentos si vuelve a fallar la conexión
+        console.log("Error al sincronizar item", item.id);
+        break;
       }
     }
 
@@ -366,7 +340,7 @@
     const output = document.getElementById("dashboardOutput");
 
     if (!navigator.onLine) {
-      output.innerText = "⚠️ La generación del Dashboard e Indicadores IA requiere conexión a Internet.";
+      output.innerText = "⚠️ La generación del Dashboard requiere conexión a Internet.";
       return;
     }
 
@@ -419,7 +393,7 @@
       `;
 
     } catch (e) {
-      output.innerText = "❌ Error al generar el gráfico. Revisa tu conexión a internet.";
+      output.innerText = "❌ Error al generar el gráfico. Revisa tu conexión.";
     }
   }
 
@@ -433,7 +407,7 @@
 
     if (!navigator.onLine) {
       chatBox.innerHTML += `<div class="msg user">${preg}</div>`;
-      chatBox.innerHTML += `<div class="msg ia">⚠️ El asistente de IA requiere conexión a internet activa para responder.</div>`;
+      chatBox.innerHTML += `<div class="msg ia">⚠️ El asistente de IA requiere conexión a internet.</div>`;
       input.value = "";
       chatBox.scrollTop = chatBox.scrollHeight;
       return;
